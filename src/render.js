@@ -15,6 +15,7 @@ const Render = (() => {
   let showGrid = true;
 
   let preview = null;           // function(ctx) drawn on the overlay during a gesture
+  let cursor = null;            // function(ctx) for the pen/eraser size ring
   let rafPending = false;
 
   const imageCache = new Map();  // src -> HTMLImageElement
@@ -74,6 +75,11 @@ const Render = (() => {
 
   function setPreview(fn) {
     preview = fn;
+    schedule();
+  }
+
+  function setCursor(fn) {
+    cursor = fn;
     schedule();
   }
 
@@ -428,6 +434,11 @@ const Render = (() => {
       preview(octx);
       octx.restore();
     }
+    if (cursor) {
+      octx.save();
+      cursor(octx);
+      octx.restore();
+    }
   }
 
   function drawMarquee(c, r) {
@@ -623,7 +634,7 @@ const Render = (() => {
   }
 
   return {
-    resize, schedule, setPreview,
+    resize, schedule, setPreview, setCursor,
     worldToScreen, screenToWorld, visibleWorldRect, getSize,
     handlePoints, drawMarquee, drawCursorRing,
     drawStroke, drawShape,

@@ -22,6 +22,19 @@ const Elements = (() => {
     WS.commit();
   }
 
+  /* Chromium leaves a contenteditable's highlight on screen after it loses
+     focus, and the canvas suppresses the default mousedown that would other-
+     wise collapse it, so drop any range still sitting inside the element. */
+  function dropSelectionInside(el) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !el) return;
+    const node = sel.anchorNode;
+    const asEl = node && (node.nodeType === 1 ? node : node.parentNode);
+    if (asEl && el.contains(asEl)) sel.removeAllRanges();
+  }
+
+  const EDITABLE_SEL = '.textedit, .todo-title, .todo-text';
+
   function plainPaste(e) {
     e.preventDefault();
     const text = (e.clipboardData || window.clipboardData).getData('text/plain');
@@ -142,6 +155,7 @@ const Elements = (() => {
     });
     edit.addEventListener('blur', () => {
       if (editingId === item.id) editingId = null;
+      dropSelectionInside(edit);
       if (free) edit.setAttribute('contenteditable', 'false');
       const text = edit.innerText.replace(/ /g, ' ');
       if (text !== item.text) { item.text = text; WS.markDirty(); }
@@ -233,7 +247,7 @@ const Elements = (() => {
       WS.markDirty();
       measure(item, root);
     });
-    title.addEventListener('blur', () => { if (editingId === item.id) editingId = null; });
+    title.addEventListener('blur', () => { if (editingId === item.id) editingId = null; dropSelectionInside(title); });
     title.addEventListener('paste', plainPaste);
     title.addEventListener('keydown', (e) => {
       e.stopPropagation();
@@ -317,7 +331,7 @@ const Elements = (() => {
       text.textContent = entry.text;
       text.addEventListener('mousedown', (e) => e.stopPropagation());
       text.addEventListener('focus', () => { editingId = item.id; committedThisEdit = false; Tools.selectOnly(item.id, { keepFocus: true }); });
-      text.addEventListener('blur', () => { if (editingId === item.id) editingId = null; });
+      text.addEventListener('blur', () => { if (editingId === item.id) editingId = null; dropSelectionInside(text); });
       text.addEventListener('paste', plainPaste);
       text.addEventListener('input', () => {
         commitOnce();
@@ -568,8 +582,21 @@ const Elements = (() => {
     if (!editingId) return;
     const active = document.activeElement;
     if (active && active.blur) active.blur();
+    if (active) dropSelectionInside(active);
     editingId = null;
   }
+
+  /* Safety net: a click anywhere outside an editable clears a stale highlight,
+     including presses the canvas swallows before any blur fires. */
+  document.addEventListener('mousedown', (ev) => {
+    const inEditable = ev.target && ev.target.closest && ev.target.closest(EDITABLE_SEL);
+    if (inEditable) return;
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed) return;
+    const node = sel.anchorNode;
+    const asEl = node && (node.nodeType === 1 ? node : node.parentNode);
+    if (asEl && asEl.closest && asEl.closest(EDITABLE_SEL)) sel.removeAllRanges();
+  }, true);
 
   return {
     rebuild, addNode, removeNode, refreshStyle, syncTransforms, syncOne,

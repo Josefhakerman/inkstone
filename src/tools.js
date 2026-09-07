@@ -668,6 +668,7 @@ const Tools = (() => {
 
   function onWindowMove(e) {
     if (!gesture) return;
+    updateSizeRing(e);
     switch (gesture.kind) {
       case 'pan': panTo(e); break;
       case 'stroke': extendStroke(e); break;
@@ -780,23 +781,30 @@ const Tools = (() => {
     else openCanvasMenu(e.clientX, e.clientY, pointerWorld(e));
   }
 
+  /* Keeps the pen/eraser size ring under the cursor. Called on plain hover and
+     again while dragging, so it tracks instead of freezing where it started. */
+  function updateSizeRing(e) {
+    const ringTools = state.tool === 'pen' || state.tool === 'highlighter' || state.tool === 'eraser';
+    if (!ringTools) { Render.setCursor(null); return; }
+    const [sx, sy] = pointerPos(e);
+    const size = state.tool === 'eraser' ? state.eraserSize
+      : state.tool === 'highlighter' ? state.hlWidth : state.penWidth;
+    const color = state.tool === 'eraser' ? 'rgba(255,120,120,.85)'
+      : state.tool === 'highlighter' ? state.hlColor : state.penColor;
+    Render.setCursor((c) => Render.drawCursorRing(c, sx, sy, size, color));
+  }
+
   function onViewportMove(e) {
     const [sx, sy] = pointerPos(e);
     lastMouse = { x: e.clientX, y: e.clientY };
     hoverWorld = Render.screenToWorld(sx, sy);
+    updateSizeRing(e);
     if (gesture) return;
     updateCursor(sx, sy);
-    if (state.tool === 'pen' || state.tool === 'highlighter' || state.tool === 'eraser') {
-      const size = state.tool === 'eraser' ? state.eraserSize
-        : state.tool === 'highlighter' ? state.hlWidth : state.penWidth;
-      const color = state.tool === 'eraser' ? 'rgba(255,120,120,.75)'
-        : state.tool === 'highlighter' ? state.hlColor : state.penColor;
-      Render.setPreview((c) => Render.drawCursorRing(c, sx, sy, size, color));
-    }
   }
 
   function onViewportLeave() {
-    if (!gesture) Render.setPreview(null);
+    if (!gesture) Render.setCursor(null);
   }
 
   function updateCursor(sx, sy) {
@@ -1469,6 +1477,7 @@ const Tools = (() => {
     if (id !== 'select') { Elements.blurEditing(); clearSelection(); }
     Elements.setInteractive(id === 'select');
     Render.setPreview(null);
+    Render.setCursor(null);
     renderToolbar();
     renderProps();
     updateCursor();
@@ -1502,19 +1511,19 @@ const Tools = (() => {
     if (!WS.isOpen()) return;
     e.preventDefault();
     const [sx, sy] = pointerPos(e);
-    if (e.ctrlKey || e.metaKey) {
-      zoomAt(sx, sy, Math.exp(-e.deltaY * 0.0022));
+    // Some mice report scroll in lines rather than pixels.
+    const dy = e.deltaY * (e.deltaMode === 1 ? 16 : 1);
+    const dx = e.deltaX * (e.deltaMode === 1 ? 16 : 1);
+
+    // Shift still nudges sideways; anything else zooms about the cursor.
+    if (e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      const cam = WS.getCamera();
+      cam.x += (dy || dx) / cam.zoom;
+      WS.markCameraDirty();
+      Render.schedule();
       return;
     }
-    const cam = WS.getCamera();
-    const k = e.deltaMode === 1 ? 18 : 1;
-    if (e.shiftKey) cam.x += (e.deltaY * k) / cam.zoom;
-    else {
-      cam.x += (e.deltaX * k) / cam.zoom;
-      cam.y += (e.deltaY * k) / cam.zoom;
-    }
-    WS.markCameraDirty();
-    Render.schedule();
+    zoomAt(sx, sy, Math.exp(-dy * 0.0022));
   }
 
   /* ------------------------------------------------------------- paste */

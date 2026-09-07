@@ -8,10 +8,10 @@ renderer's content-security policy blocks outbound connections outright.
 
 ## Run it
 
-**Installed** — run `dist/InkStone-1.2.0-setup.exe`. You can pick the install
+**Installed** — run `dist/InkStone-1.3.0-setup.exe`. You can pick the install
 folder; it adds a Start Menu entry and a desktop shortcut.
 
-**Portable** — run `dist/InkStone-1.2.0-portable.exe`. No install, no admin.
+**Portable** — run `dist/InkStone-1.3.0-portable.exe`. No install, no admin.
 
 Your notes live in `%APPDATA%\InkStone\data`, not next to the exe, so both
 builds share the same library. The **Storage folder** button at the bottom of
@@ -25,9 +25,9 @@ first time it starts. The old folder is left untouched as a backup.
 Black, and unbounded in every direction. A small crosshair marks the origin so
 **Center** always means something.
 
-- **Pan** — space + drag, middle-mouse drag, the hand tool, or the scroll wheel
-  (shift + wheel moves sideways)
-- **Zoom** — ctrl + wheel, or the controls at the bottom left
+- **Zoom** — the mouse wheel, about the cursor, or the controls at the bottom left
+- **Pan** — space + drag, middle-mouse drag, or the hand tool; shift + wheel
+  nudges sideways
 - **Fit** — frames everything on the board, or just the selection if you have one
 
 ### Paper
