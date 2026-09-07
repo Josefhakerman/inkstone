@@ -29,9 +29,18 @@ async function migrateLegacyData() {
   } catch (_) { /* nothing to migrate */ }
 }
 
+async function sweepTempFiles() {
+  try {
+    for (const name of await fsp.readdir(WS_DIR())) {
+      if (name.endsWith('.tmp')) await fsp.unlink(path.join(WS_DIR(), name)).catch(() => {});
+    }
+  } catch (_) { /* nothing to sweep */ }
+}
+
 async function ensureDirs() {
   await migrateLegacyData();
   await fsp.mkdir(WS_DIR(), { recursive: true });
+  await sweepTempFiles();
 }
 
 // Atomic write: temp file + rename, so a crash mid-save can't shred a note.
@@ -85,7 +94,7 @@ function createWindow() {
     if (allowClose || mainWindow.webContents.isCrashed()) return;
     e.preventDefault();
     const done = () => { allowClose = true; mainWindow.close(); };
-    const timer = setTimeout(done, 1500);
+    const timer = setTimeout(done, 8000);
     ipcMain.once('app:flushed', () => { clearTimeout(timer); done(); });
     mainWindow.webContents.send('app:flush');
   });

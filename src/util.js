@@ -22,6 +22,7 @@ const U = (() => {
       t = setTimeout(() => { t = null; fn(...args); }, ms);
     };
     wrapped.flush = (...args) => { if (t) { clearTimeout(t); t = null; fn(...args); } };
+    wrapped.cancel = () => { if (t) { clearTimeout(t); t = null; } };
     wrapped.pending = () => t !== null;
     return wrapped;
   }

@@ -152,7 +152,7 @@ const WS = (() => {
   /* ------------------------------------------------------ persistence */
 
   let dirty = false;
-  let saving = false;
+  let inFlight = null;          // promise for the write currently on the wire
 
   function markDirty() {
     if (!isOpen() || loading) return;
@@ -163,9 +163,8 @@ const WS = (() => {
 
   const autosave = U.debounce(() => { void flushSave(); }, 550);
 
-  async function flushSave() {
-    if (!isOpen() || !dirty || saving) return;
-    saving = true;
+  /* Starts one write and records it, so callers can await the real thing. */
+  function writeNow() {
     const payload = {
       version: 1,
       id,
@@ -175,28 +174,49 @@ const WS = (() => {
       items
     };
     const snap = snapshot();
-    try {
-      await window.api.saveWorkspace(id, payload);
-      savedSnapshot = snap;
-      dirty = false;
-      App.setSaveState('saved');
-    } catch (err) {
-      console.error('workspace save failed', err);
-      App.setSaveState('error');
-      U.toast('Could not save this workspace');
-    } finally {
-      saving = false;
-    }
+    dirty = false;                       // anything after this point re-dirties
+    App.setSaveState('saving');
+
+    const p = (async () => {
+      try {
+        await window.api.saveWorkspace(id, payload);
+        savedSnapshot = snap;
+        App.setSaveState('saved');
+      } catch (err) {
+        console.error('workspace save failed', err);
+        dirty = true;                    // keep it pending so we try again
+        App.setSaveState('error');
+        U.toast('Could not save this workspace');
+      } finally {
+        if (inFlight === p) inFlight = null;
+      }
+    })();
+
+    inFlight = p;
+    return p;
+  }
+
+  /* Resolves only once nothing is left to write. Awaiting an in-flight write
+     matters on quit: returning early there truncates the file being renamed. */
+  async function flushSave() {
+    if (!isOpen()) return;
+    if (inFlight) await inFlight;
+    if (dirty) await writeNow();
   }
 
   /* Force a write right now (used on close / app exit / switching workspace). */
   async function saveNow() {
-    autosave.flush();
-    if (dirty) await flushSave();
+    autosave.cancel();
+    cameraSave.cancel();
+    if (!isOpen()) return;
+    await flushSave();
+    // Editing during the write leaves it dirty again; one more pass settles it.
+    if (dirty || inFlight) await flushSave();
   }
 
   /* Camera changes are persisted, but they are not undoable and not urgent. */
   const cameraSave = U.debounce(() => { dirty = true; void flushSave(); }, 900);
+
   function markCameraDirty() {
     if (!isOpen() || loading) return;
     cameraSave();

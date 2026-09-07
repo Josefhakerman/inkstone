@@ -181,7 +181,7 @@ npm start          # run from source
 npm run dist       # build the installer and portable exe into dist/
 ```
 
-Requires Node 18+. `npm install` needs to fetch the Electron binary once; after
+Requires Node 20+. `npm install` needs to fetch the Electron binary once; after
 that the app itself never touches the network.
 
 To run against a throwaway library instead of your real notes, pass
