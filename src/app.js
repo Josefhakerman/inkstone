@@ -10,13 +10,13 @@ const App = (() => {
 
   function refreshTitle() {
     const t = document.getElementById('tbTitle');
-    if (!WS.isOpen()) { t.textContent = ''; document.title = 'InkStone'; return; }
+    if (!WS.isOpen()) { t.textContent = ''; document.title = 'Kivrn'; return; }
     const node = Store.find(WS.getId());
     const name = node ? node.name : WS.getName();
     WS.setName(name);
     const path = Store.pathOf(WS.getId());
     t.textContent = path.length ? `${path.join(' / ')} / ${name}` : name;
-    document.title = `${name} — InkStone`;
+    document.title = `${name} — Kivrn`;
   }
 
   function setSaveState(kind) {
@@ -319,6 +319,6 @@ const App = (() => {
 window.addEventListener('DOMContentLoaded', () => {
   App.init().catch((err) => {
     console.error('startup failed', err);
-    U.toast('InkStone could not start - see the console for details', 8000);
+    U.toast('Kivrn could not start - see the console for details', 8000);
   });
 });

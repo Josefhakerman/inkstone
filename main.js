@@ -15,18 +15,27 @@ const DATA_DIR = () => path.join(app.getPath('userData'), 'data');
 const WS_DIR = () => path.join(DATA_DIR(), 'workspaces');
 const TREE_FILE = () => path.join(DATA_DIR(), 'tree.json');
 
-// The app used to be called NoteApp; carry an existing library over on first run.
+// The app has been renamed twice (NoteApp -> InkStone -> Kivrn) and the data
+// folder is keyed to the product name, so carry an older library over on first
+// run. Newest name first, and the old folder is left alone as a backup.
+const LEGACY_APP_NAMES = ['InkStone', 'NoteApp'];
+
 async function migrateLegacyData() {
   try {
     await fsp.access(DATA_DIR());
     return;                                   // already have our own data
   } catch (_) { /* fall through */ }
-  const legacy = path.join(path.dirname(app.getPath('userData')), 'NoteApp', 'data');
-  try {
-    await fsp.access(legacy);
-    await fsp.cp(legacy, DATA_DIR(), { recursive: true });
-    console.log('migrated notes from the previous NoteApp folder');
-  } catch (_) { /* nothing to migrate */ }
+
+  const parent = path.dirname(app.getPath('userData'));
+  for (const name of LEGACY_APP_NAMES) {
+    const legacy = path.join(parent, name, 'data');
+    try {
+      await fsp.access(legacy);
+      await fsp.cp(legacy, DATA_DIR(), { recursive: true });
+      console.log(`migrated notes from the previous ${name} folder`);
+      return;
+    } catch (_) { /* try the next name */ }
+  }
 }
 
 async function sweepTempFiles() {

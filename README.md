@@ -1,4 +1,4 @@
-# InkStone
+# Kivrn
 
 An offline Windows app for writing notes and ideas on unlimited black canvases,
 organised into folders. Microsoft Paint × Google Keep, in monochrome.
@@ -6,28 +6,29 @@ organised into folders. Microsoft Paint × Google Keep, in monochrome.
 Nothing leaves your machine: there is no network code in the app at all, and the
 renderer's content-security policy blocks outbound connections outright.
 
-![InkStone](docs/screenshot.png)
+![Kivrn](docs/screenshot.png)
 
 ## Download
 
 Grab the latest build from the
-[releases page](https://github.com/Josefhakerman/inkstone/releases/latest):
+[releases page](https://github.com/Josefhakerman/kivrn/releases/latest):
 
-- **`InkStone-<version>-setup.exe`** — installer. You can pick the install
+- **`Kivrn-<version>-setup.exe`** — installer. You can pick the install
   folder; it adds a Start Menu entry and a desktop shortcut.
-- **`InkStone-<version>-portable.exe`** — no install, no admin.
+- **`Kivrn-<version>-portable.exe`** — no install, no admin.
 
 The executables are not code-signed, so Windows SmartScreen shows an "unknown
 publisher" warning the first time: choose *More info → Run anyway*. If you would
 rather not take that on trust, [build it yourself](#building-from-source) — it
 is two commands.
 
-Your notes live in `%APPDATA%\InkStone\data`, not next to the exe, so both
+Your notes live in `%APPDATA%\Kivrn\data`, not next to the exe, so both
 builds share the same library. The **Storage folder** button at the bottom of
 the sidebar opens it.
 
-If you used the earlier NoteApp build, InkStone copies that library across the
-first time it starts. The old folder is left untouched as a backup.
+If you used an earlier build under an old name — NoteApp, then InkStone — Kivrn
+copies that library across the first time it starts. The old folder is left
+untouched as a backup.
 
 ## The workspace
 
@@ -142,7 +143,7 @@ thing you draw inherits it instead of snapping back to the old value.
 Everything autosaves about half a second after you stop, and again on window
 blur; closing the window waits for the last write to land. Writes go through a
 temp file and a rename, so a crash mid-save can't corrupt a board. Each
-workspace is a plain JSON file in `%APPDATA%\InkStone\data\workspaces`.
+workspace is a plain JSON file in `%APPDATA%\Kivrn\data\workspaces`.
 
 Undo (`Ctrl+Z`) and redo (`Ctrl+Y`) hold the last 80 steps of the open board.
 

@@ -1,8 +1,8 @@
 {
-  "name": "inkstone",
-  "productName": "InkStone",
-  "version": "1.4.0",
-  "description": "Offline infinite-canvas notes app for Windows. Ink, blocks, and unlimited space.",
+  "name": "kivrn",
+  "productName": "Kivrn",
+  "version": "1.5.0",
+  "description": "Offline infinite-canvas notes app for Windows. Monochrome, blocky, unlimited space.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -15,8 +15,8 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.josef.inkstone",
-    "productName": "InkStone",
+    "appId": "com.josef.kivrn",
+    "productName": "Kivrn",
     "files": [
       "main.js",
       "preload.js",
@@ -36,13 +36,13 @@
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "shortcutName": "InkStone",
+      "shortcutName": "Kivrn",
       "createDesktopShortcut": true,
-      "artifactName": "InkStone-${version}-setup.exe"
+      "artifactName": "Kivrn-${version}-setup.exe"
     },
     "afterPack": "build/after-pack.js",
     "portable": {
-      "artifactName": "InkStone-${version}-portable.exe"
+      "artifactName": "Kivrn-${version}-portable.exe"
     }
   },
   "allowScripts": {
