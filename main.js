@@ -15,7 +15,22 @@ const DATA_DIR = () => path.join(app.getPath('userData'), 'data');
 const WS_DIR = () => path.join(DATA_DIR(), 'workspaces');
 const TREE_FILE = () => path.join(DATA_DIR(), 'tree.json');
 
+// The app used to be called NoteApp; carry an existing library over on first run.
+async function migrateLegacyData() {
+  try {
+    await fsp.access(DATA_DIR());
+    return;                                   // already have our own data
+  } catch (_) { /* fall through */ }
+  const legacy = path.join(path.dirname(app.getPath('userData')), 'NoteApp', 'data');
+  try {
+    await fsp.access(legacy);
+    await fsp.cp(legacy, DATA_DIR(), { recursive: true });
+    console.log('migrated notes from the previous NoteApp folder');
+  } catch (_) { /* nothing to migrate */ }
+}
+
 async function ensureDirs() {
+  await migrateLegacyData();
   await fsp.mkdir(WS_DIR(), { recursive: true });
 }
 
@@ -47,11 +62,11 @@ function createWindow() {
     height: 900,
     minWidth: 900,
     minHeight: 560,
-    backgroundColor: '#0a0a0c',
+    backgroundColor: '#000000',
     show: false,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#101014', symbolColor: '#b6bcc4', height: 36 },
+    titleBarOverlay: { color: '#000000', symbolColor: '#e8e8e8', height: 36 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

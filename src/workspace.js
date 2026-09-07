@@ -10,6 +10,7 @@ const WS = (() => {
   let name = '';
   let items = [];
   let camera = { x: 0, y: 0, zoom: 1 };
+  let background = { type: 'dots', size: 40 };   // per-workspace paper
 
   let undoStack = [];
   let redoStack = [];
@@ -23,6 +24,12 @@ const WS = (() => {
   const getName = () => name;
   const getItems = () => items;
   const getCamera = () => camera;
+  const getBackground = () => background;
+  function setBackground(patch) {
+    background = { ...background, ...patch };
+    markDirty();
+    Render.schedule();
+  }
   const getItem = (itemId) => items.find((i) => i.id === itemId) || null;
   const indexOf = (itemId) => items.findIndex((i) => i.id === itemId);
 
@@ -79,6 +86,16 @@ const WS = (() => {
     const before = items.length;
     items = items.filter((i) => !set.has(i.id));
     if (items.length !== before) markDirty();
+  }
+
+  /* Swap one item for zero or more replacements, keeping its place in the
+     z-order. Used by the partial eraser when it cuts a stroke into pieces. */
+  function replaceItem(itemId, replacements) {
+    const idx = items.findIndex((i) => i.id === itemId);
+    if (idx < 0) return false;
+    items.splice(idx, 1, ...replacements);
+    markDirty();
+    return true;
   }
 
   function bringToFront(ids) {
@@ -154,6 +171,7 @@ const WS = (() => {
       id,
       name,
       camera: { x: camera.x, y: camera.y, zoom: camera.zoom },
+      background: { type: background.type, size: background.size },
       items
     };
     const snap = snapshot();
@@ -216,7 +234,7 @@ const WS = (() => {
           ...base,
           x: num(it.x), y: num(it.y), w: U.clamp(num(it.w, 260), 40, 6000), h: num(it.h, 40),
           text: typeof it.text === 'string' ? it.text : '',
-          color: typeof it.color === 'string' ? it.color : '#e6e8ec',
+          color: typeof it.color === 'string' ? it.color : '#ffffff',
           size: U.clamp(num(it.size, 18), 6, 200),
           bold: !!it.bold
         });
@@ -225,7 +243,7 @@ const WS = (() => {
           ...base,
           x: num(it.x), y: num(it.y), w: U.clamp(num(it.w, 280), 120, 3000), h: num(it.h, 120),
           title: typeof it.title === 'string' ? it.title : '',
-          color: typeof it.color === 'string' ? it.color : '#7aa2ff',
+          color: typeof it.color === 'string' ? it.color : '#ffffff',
           size: U.clamp(num(it.size, 15), 8, 90),
           entries: Array.isArray(it.entries)
             ? it.entries.filter((e) => e && typeof e === 'object').map((e) => ({
@@ -276,6 +294,13 @@ const WS = (() => {
       y: cam && isFinite(cam.y) ? cam.y : 0,
       zoom: cam && isFinite(cam.zoom) ? U.clamp(cam.zoom, 0.05, 8) : 1
     };
+    const bg = data && data.background;
+    const BG_TYPES = ['dots', 'grid', 'lines', 'columns', 'graph', 'plain'];
+    background = {
+      type: bg && BG_TYPES.includes(bg.type) ? bg.type : 'dots',
+      size: bg && isFinite(bg.size) ? U.clamp(bg.size, 8, 400) : 40
+    };
+
     savedSnapshot = snapshot();
     loading = false;
     return true;
@@ -289,12 +314,14 @@ const WS = (() => {
     undoStack = [];
     redoStack = [];
     camera = { x: 0, y: 0, zoom: 1 };
+    background = { type: 'dots', size: 40 };
   }
 
   return {
     isOpen, getId, getName, setName, getItems, getItem, indexOf, getCamera,
+    getBackground, setBackground,
     bounds, contentBounds,
-    add, addMany, removeIds, bringToFront, sendToBack,
+    add, addMany, removeIds, replaceItem, bringToFront, sendToBack,
     commit, undo, redo, canUndo, canRedo,
     markDirty, markCameraDirty, saveNow, open, close
   };

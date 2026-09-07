@@ -17,11 +17,11 @@ const Tools = (() => {
     shape: 'rect',
     penColor: '#ffffff', penWidth: 3,
     hlColor: '#ffd43b', hlWidth: 22,
-    eraserSize: 26,
-    shapeColor: '#c9d1d9', shapeWidth: 2, shapeFill: null,
-    textColor: '#e6e8ec', textSize: 18, textBold: false,
-    todoColor: '#7aa2ff', todoSize: 15,
-    fillColor: '#4dabf7'
+    eraserSize: 26, eraserMode: 'part',
+    shapeColor: '#ffffff', shapeWidth: 2, shapeFill: null,
+    textColor: '#ffffff', textSize: 18, textBold: false,
+    todoColor: '#ffffff', todoSize: 15,
+    fillColor: '#ffffff'
   };
 
   let state = { ...DEFAULTS };
@@ -360,36 +360,111 @@ const Tools = (() => {
   /* ---- eraser ------------------------------------------------------- */
 
   function beginErase(e) {
-    gesture = { kind: 'erase', removed: false, committed: false };
+    const [wx, wy] = pointerWorld(e);
+    gesture = { kind: 'erase', committed: false, px: wx, py: wy };
     eraseAt(e);
+  }
+
+  /* Distance from a point to the path the eraser swept this frame. Using the
+     whole segment (not just the current position) means a fast drag still
+     cuts cleanly instead of leaving gaps between mouse samples. */
+  const sweptDist = (x, y, g, wx, wy) => U.distToSegment(x, y, g.px, g.py, wx, wy);
+
+  /* Splits one stroke around the eraser sweep, returning the surviving runs
+     of points, or null when the stroke is untouched. */
+  function cutStroke(item, g, wx, wy, r) {
+    const p = item.points;
+    const n = p.length / 2;
+    if (n === 0) return null;
+
+    const runs = [];
+    let run = [];
+    let cutAny = false;
+
+    const feed = (x, y) => {
+      if (sweptDist(x, y, g, wx, wy) <= r) {
+        cutAny = true;
+        if (run.length >= 4) runs.push(run);
+        run = [];
+      } else {
+        run.push(x, y);
+      }
+    };
+
+    feed(p[0], p[1]);
+    for (let i = 1; i < n; i++) {
+      const ax = p[(i - 1) * 2], ay = p[(i - 1) * 2 + 1];
+      const bx = p[i * 2], by = p[i * 2 + 1];
+      // Walk long segments in small steps so the eraser can bite mid-segment.
+      const len = Math.hypot(bx - ax, by - ay);
+      const steps = len > r / 2 ? Math.min(96, Math.ceil(len / (r / 2))) : 1;
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        feed(ax + (bx - ax) * t, ay + (by - ay) * t);
+      }
+    }
+    if (run.length >= 4) runs.push(run);
+
+    return cutAny ? runs : null;
   }
 
   function eraseAt(e) {
     const [wx, wy] = pointerWorld(e);
+    const g = gesture;
     const r = state.eraserSize / 2;
+    const partial = state.eraserMode === 'part';
+
+    // Bounding box of the swept eraser disc, for cheap rejection.
+    const sweep = {
+      x: Math.min(g.px, wx) - r, y: Math.min(g.py, wy) - r,
+      w: Math.abs(wx - g.px) + r * 2, h: Math.abs(wy - g.py) + r * 2
+    };
+
     const doomed = [];
-    for (const it of WS.getItems()) {
+    const touch = () => { if (!g.committed) { WS.commit(); g.committed = true; } };
+
+    for (const it of WS.getItems().slice()) {
       if (it.type !== 'stroke' && it.type !== 'shape') continue;
-      const b = WS.bounds(it);
-      if (!U.rectsOverlap({ x: wx - r, y: wy - r, w: r * 2, h: r * 2 }, b)) continue;
-      if (it.type === 'stroke') {
+      if (!U.rectsOverlap(sweep, WS.bounds(it))) continue;
+
+      if (it.type === 'shape') {
+        // Shapes are not polylines, so both modes remove them whole.
+        if (hitShape(it, wx, wy, r)) doomed.push(it.id);
+        continue;
+      }
+
+      if (!partial) {
         const p = it.points;
         let hit = false;
         for (let k = 0; k + 3 < p.length && !hit; k += 2) {
-          if (U.distToSegment(wx, wy, p[k], p[k + 1], p[k + 2], p[k + 3]) <= r + it.width / 2) hit = true;
+          if (sweptDist(p[k], p[k + 1], g, wx, wy) <= r + it.width / 2) hit = true;
+          else if (U.distToSegment(g.px, g.py, p[k], p[k + 1], p[k + 2], p[k + 3]) <= r + it.width / 2) hit = true;
         }
-        if (!hit && p.length === 2 && U.dist(wx, wy, p[0], p[1]) <= r + it.width / 2) hit = true;
+        if (!hit && p.length >= 2 && sweptDist(p[0], p[1], g, wx, wy) <= r + it.width / 2) hit = true;
         if (hit) doomed.push(it.id);
-      } else if (hitShape(it, wx, wy, r)) {
-        doomed.push(it.id);
+        continue;
       }
+
+      const runs = cutStroke(it, g, wx, wy, r);
+      if (!runs) continue;
+      touch();
+      const pieces = runs.map((pts) => ({
+        id: U.uid('i'), type: 'stroke', tool: it.tool,
+        color: it.color, width: it.width, points: pts
+      }));
+      WS.replaceItem(it.id, pieces);
+      selection.delete(it.id);
     }
+
     if (doomed.length) {
-      if (!gesture.committed) { WS.commit(); gesture.committed = true; }
+      touch();
       WS.removeIds(doomed);
       for (const id of doomed) selection.delete(id);
-      Render.schedule();
     }
+
+    g.px = wx;
+    g.py = wy;
+    Render.schedule();
   }
 
   /* ---- marquee ------------------------------------------------------ */
@@ -964,8 +1039,53 @@ const Tools = (() => {
       { label: 'Add workspace link', icon: 'link', action: async () => { const t = await pickWorkspace('Link to workspace'); if (!t) return; const i = newLinkItem(world[0], world[1], t.id, t.name); WS.commit(); WS.add(i); Elements.addNode(i); selectOnly(i.id); } },
       { sep: true },
       { label: 'Select all', icon: 'select', key: 'Ctrl+A', action: selectAll },
-      { label: Render.getShowGrid() ? 'Hide dot grid' : 'Show dot grid', icon: 'board', action: () => { Render.setShowGrid(!Render.getShowGrid()); try { localStorage.setItem('showGrid', Render.getShowGrid() ? '1' : '0'); } catch (_) {} } }
+      { label: 'Background…', icon: 'board', key: 'G', action: () => openPaperMenu(x, y) }
     ]);
+  }
+
+  /* ------------------------------------------------------------- paper */
+
+  const PAPER_SIZES = [
+    { v: 20, label: 'Fine' },
+    { v: 40, label: 'Normal' },
+    { v: 80, label: 'Wide' },
+    { v: 160, label: 'Extra wide' }
+  ];
+
+  /* Background is a property of the workspace, not a global preference, so
+     each board can carry the paper that suits it. */
+  function openPaperMenu(x, y) {
+    if (!WS.isOpen()) { U.toast('Open a workspace first'); return; }
+    const bg = WS.getBackground();
+    const items = [];
+
+    for (const b of Render.BACKGROUNDS) {
+      items.push({
+        label: b.label,
+        icon: bg.type === b.id ? 'check' : null,
+        action: () => { WS.setBackground({ type: b.id }); App.updatePaperLabel(); openPaperMenu(x, y); }
+      });
+    }
+    items.push({ sep: true });
+    for (const s of PAPER_SIZES) {
+      items.push({
+        label: s.label,
+        icon: bg.size === s.v ? 'check' : null,
+        action: () => { WS.setBackground({ size: s.v }); App.updatePaperLabel(); openPaperMenu(x, y); }
+      });
+    }
+    U.contextMenu(x, y, items);
+  }
+
+  /* Step through the background styles - bound to G. */
+  function cyclePaper() {
+    if (!WS.isOpen()) return;
+    const list = Render.BACKGROUNDS;
+    const cur = list.findIndex((b) => b.id === WS.getBackground().type);
+    const next = list[(cur + 1) % list.length];
+    WS.setBackground({ type: next.id });
+    App.updatePaperLabel();
+    U.toast(next.label);
   }
 
   /* DOM node stacking must follow item order after a z-order change. */
@@ -1085,9 +1205,24 @@ const Tools = (() => {
           ]));
           parts.push(sep(), slider('Size', state.hlWidth, 6, 90, 1, (v) => { state.hlWidth = v; saveState(); }));
           break;
-        case 'eraser':
+        case 'eraser': {
+          const modes = [
+            ['part', 'Partial', 'Rubs out only the bit of a stroke you cross'],
+            ['stroke', 'Whole', 'Removes the entire stroke you touch']
+          ];
+          const row = U.el('div', { class: 'pgroup' });
+          row.appendChild(U.el('span', { class: 'plabel', text: 'Erase' }));
+          for (const [id, label, hint] of modes) {
+            row.appendChild(U.el('button', {
+              class: 'pbtn' + (state.eraserMode === id ? ' on' : ''),
+              text: label, title: hint,
+              onclick: () => { state.eraserMode = id; saveState(); renderProps(); }
+            }));
+          }
+          parts.push(row, sep());
           parts.push(slider('Size', state.eraserSize, 6, 140, 1, (v) => { state.eraserSize = v; saveState(); }));
           break;
+        }
         case 'shape': {
           const shapes = ['rect', 'ellipse', 'diamond', 'line', 'arrow'];
           const row = U.el('div', { class: 'pgroup' });
@@ -1395,10 +1530,7 @@ const Tools = (() => {
       return;
     }
     if (KEY_TOOL[k] && !e.repeat) { setTool(KEY_TOOL[k]); return; }
-    if (k === 'g') {
-      Render.setShowGrid(!Render.getShowGrid());
-      try { localStorage.setItem('showGrid', Render.getShowGrid() ? '1' : '0'); } catch (_) {}
-    }
+    if (k === 'g') cyclePaper();
   }
 
   function onKeyUp(e) {
@@ -1436,7 +1568,7 @@ const Tools = (() => {
     selectionBounds, canResizeSelection, selectionItems,
     beginMoveDrag, openSelectionMenu,
     deleteSelection, duplicateSelection, copySelection, pasteClipboard, selectAll,
-    zoomBy, zoomAt, renderProps, renderToolbar,
+    zoomBy, zoomAt, renderProps, renderToolbar, openPaperMenu, cyclePaper,
     insertImages, pickWorkspace, newLinkItem
   };
 })();

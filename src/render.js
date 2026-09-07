@@ -77,45 +77,118 @@ const Render = (() => {
     schedule();
   }
 
-  /* -------------------------------------------------------------- grid */
+  /* -------------------------------------------------------- background */
 
-  function drawGrid() {
-    if (!showGrid) return;
+  /* Each workspace picks its own paper. Spacing is multiplied up or down so
+     the pattern stays legible instead of turning to mush at extreme zooms. */
+  const BACKGROUNDS = [
+    { id: 'dots', label: 'Dots' },
+    { id: 'grid', label: 'Grid' },
+    { id: 'graph', label: 'Graph' },
+    { id: 'lines', label: 'Ruled lines' },
+    { id: 'columns', label: 'Columns' },
+    { id: 'plain', label: 'Plain' }
+  ];
+
+  /* Returns [effective world step, on-screen step] for the current zoom. */
+  function fitStep(base, zoom, min = 22, max = 190) {
+    let step = base;
+    let guard = 0;
+    while (step * zoom < min && guard++ < 24) step *= 2;
+    guard = 0;
+    while (step * zoom > max && guard++ < 24) step /= 2;
+    return [step, step * zoom];
+  }
+
+  function drawBackground() {
+    const bg = WS.getBackground();
+    if (!bg || bg.type === 'plain' || !showGrid) { drawOrigin(); return; }
+
     const zoom = WS.getCamera().zoom;
-    // Pick a spacing that stays roughly 26-90 screen px apart at any zoom.
-    let step = 40;
-    while (step * zoom < 26) step *= 4;
-    while (step * zoom > 200) step /= 4;
-    const screenStep = step * zoom;
-    if (screenStep < 8) return;
+    const [step, screenStep] = fitStep(bg.size || 40, zoom);
+    if (screenStep < 6) { drawOrigin(); return; }
 
-    const vr = visibleWorldRect(step);
+    const vr = visibleWorldRect(step * 2);
     const startX = Math.floor(vr.x / step) * step;
     const startY = Math.floor(vr.y / step) * step;
+    const fade = U.clamp((screenStep - 14) / 40, 0, 1);
+    if (fade <= 0.02) { drawOrigin(); return; }
 
-    const alpha = U.clamp((screenStep - 20) / 55, 0, 1) * 0.5;
-    if (alpha <= 0.01) return;
     ctx.save();
-    ctx.fillStyle = `rgba(150,160,180,${alpha.toFixed(3)})`;
-    const r = screenStep > 90 ? 1.35 : 1;
-    for (let wx = startX; wx < vr.x + vr.w; wx += step) {
-      for (let wy = startY; wy < vr.y + vr.h; wy += step) {
-        const [sx, sy] = worldToScreen(wx, wy);
-        ctx.beginPath();
-        ctx.arc(sx, sy, r, 0, Math.PI * 2);
-        ctx.fill();
+    const ink = (a) => `rgba(255,255,255,${(a * fade).toFixed(3)})`;
+
+    if (bg.type === 'dots') {
+      ctx.fillStyle = ink(0.30);
+      const r = screenStep > 90 ? 1.6 : 1.2;
+      for (let wx = startX; wx < vr.x + vr.w; wx += step) {
+        for (let wy = startY; wy < vr.y + vr.h; wy += step) {
+          const [sx, sy] = worldToScreen(wx, wy);
+          ctx.fillRect(sx - r, sy - r, r * 2, r * 2);
+        }
       }
-    }
-    // Origin marker, so "Center" always means something visible.
-    const [ox, oy] = worldToScreen(0, 0);
-    if (ox > -40 && ox < vw + 40 && oy > -40 && oy < vh + 40) {
-      ctx.strokeStyle = 'rgba(122,162,255,.30)';
+    } else if (bg.type === 'lines') {
+      ctx.strokeStyle = ink(0.18);
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(ox - 9, oy); ctx.lineTo(ox + 9, oy);
-      ctx.moveTo(ox, oy - 9); ctx.lineTo(ox, oy + 9);
+      for (let wy = startY; wy < vr.y + vr.h; wy += step) {
+        const [, sy] = worldToScreen(vr.x, wy);
+        const y = Math.round(sy) + 0.5;
+        ctx.moveTo(0, y); ctx.lineTo(vw, y);
+      }
       ctx.stroke();
+    } else if (bg.type === 'columns') {
+      ctx.strokeStyle = ink(0.18);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let wx = startX; wx < vr.x + vr.w; wx += step) {
+        const [sx] = worldToScreen(wx, vr.y);
+        const x = Math.round(sx) + 0.5;
+        ctx.moveTo(x, 0); ctx.lineTo(x, vh);
+      }
+      ctx.stroke();
+    } else if (bg.type === 'grid' || bg.type === 'graph') {
+      // Graph paper adds a heavier rule every fifth line.
+      const major = bg.type === 'graph' ? 5 : 0;
+      const line = (a, w) => { ctx.strokeStyle = ink(a); ctx.lineWidth = w; };
+
+      const drawSet = (wantMajor) => {
+        ctx.beginPath();
+        for (let wx = startX; wx < vr.x + vr.w; wx += step) {
+          const isMajor = major && Math.round(wx / step) % major === 0;
+          if (!!isMajor !== wantMajor) continue;
+          const [sx] = worldToScreen(wx, vr.y);
+          const x = Math.round(sx) + 0.5;
+          ctx.moveTo(x, 0); ctx.lineTo(x, vh);
+        }
+        for (let wy = startY; wy < vr.y + vr.h; wy += step) {
+          const isMajor = major && Math.round(wy / step) % major === 0;
+          if (!!isMajor !== wantMajor) continue;
+          const [, sy] = worldToScreen(vr.x, wy);
+          const y = Math.round(sy) + 0.5;
+          ctx.moveTo(0, y); ctx.lineTo(vw, y);
+        }
+        ctx.stroke();
+      };
+
+      line(0.13, 1);
+      drawSet(false);
+      if (major) { line(0.30, 1.6); drawSet(true); }
     }
+    ctx.restore();
+    drawOrigin();
+  }
+
+  /* Origin marker, so "Center" always means something visible. */
+  function drawOrigin() {
+    const [ox, oy] = worldToScreen(0, 0);
+    if (ox < -40 || ox > vw + 40 || oy < -40 || oy > vh + 40) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,.34)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(ox - 8, oy); ctx.lineTo(ox + 8, oy);
+    ctx.moveTo(ox, oy - 8); ctx.lineTo(ox, oy + 8);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -260,9 +333,9 @@ const Render = (() => {
       c.restore();
     } else {
       c.save();
-      c.fillStyle = '#15151b';
-      c.strokeStyle = '#2a2a34';
-      c.lineWidth = 1;
+      c.fillStyle = '#000000';
+      c.strokeStyle = '#5e5e5e';
+      c.lineWidth = 2;
       c.fillRect(sx, sy, w, h);
       c.strokeRect(sx, sy, w, h);
       c.restore();
@@ -276,7 +349,7 @@ const Render = (() => {
     ctx.clearRect(0, 0, vw, vh);
     if (!WS.isOpen()) return;
 
-    drawGrid();
+    drawBackground();
 
     const vr = visibleWorldRect();
     for (const item of WS.getItems()) {
@@ -290,7 +363,7 @@ const Render = (() => {
 
   /* ------------------------------------------------------------ overlay */
 
-  const HANDLE_R = 4.5;
+  const HANDLE_R = 5;
 
   /* Handle positions in screen space for a world rect. */
   function handlePoints(rect) {
@@ -314,9 +387,9 @@ const Render = (() => {
       // Per-item outlines when several things are picked.
       if (sel.size > 1) {
         octx.save();
-        octx.strokeStyle = 'rgba(122,162,255,.42)';
-        octx.lineWidth = 1;
-        octx.setLineDash([3, 3]);
+        octx.strokeStyle = 'rgba(255,255,255,.45)';
+        octx.lineWidth = 1.5;
+        octx.setLineDash([4, 4]);
         for (const itemId of sel) {
           const item = WS.getItem(itemId);
           if (!item) continue;
@@ -333,16 +406,15 @@ const Render = (() => {
         const [x0, y0] = worldToScreen(box.x, box.y);
         const [x1, y1] = worldToScreen(box.x + box.w, box.y + box.h);
         octx.save();
-        octx.strokeStyle = '#7aa2ff';
-        octx.lineWidth = 1.25;
+        octx.strokeStyle = '#ffffff';
+        octx.lineWidth = 2;
         octx.strokeRect(x0, y0, x1 - x0, y1 - y0);
         if (Tools.canResizeSelection()) {
-          octx.fillStyle = '#0d0d12';
+          octx.fillStyle = '#000000';
+          octx.lineWidth = 2;
           for (const h of handlePoints(box)) {
-            octx.beginPath();
-            octx.arc(h.x, h.y, HANDLE_R, 0, Math.PI * 2);
-            octx.fill();
-            octx.stroke();
+            octx.fillRect(h.x - HANDLE_R, h.y - HANDLE_R, HANDLE_R * 2, HANDLE_R * 2);
+            octx.strokeRect(h.x - HANDLE_R, h.y - HANDLE_R, HANDLE_R * 2, HANDLE_R * 2);
           }
         }
         octx.restore();
@@ -359,11 +431,13 @@ const Render = (() => {
   function drawMarquee(c, r) {
     const [x0, y0] = worldToScreen(r.x, r.y);
     const [x1, y1] = worldToScreen(r.x + r.w, r.y + r.h);
-    c.fillStyle = 'rgba(122,162,255,.11)';
-    c.strokeStyle = 'rgba(122,162,255,.75)';
-    c.lineWidth = 1;
+    c.fillStyle = 'rgba(255,255,255,.10)';
+    c.strokeStyle = '#ffffff';
+    c.lineWidth = 2;
+    c.setLineDash([6, 4]);
     c.fillRect(x0, y0, x1 - x0, y1 - y0);
     c.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    c.setLineDash([]);
   }
 
   /* Ring showing pen / eraser size at the cursor. */
@@ -371,8 +445,8 @@ const Render = (() => {
     const r = Math.max(2, (worldSize * WS.getCamera().zoom) / 2);
     c.beginPath();
     c.arc(sx, sy, r, 0, Math.PI * 2);
-    c.strokeStyle = color || 'rgba(230,232,236,.6)';
-    c.lineWidth = 1;
+    c.strokeStyle = color || 'rgba(255,255,255,.7)';
+    c.lineWidth = 1.5;
     c.stroke();
   }
 
@@ -425,10 +499,10 @@ const Render = (() => {
     const h = item.h || 120;
     if (c.roundRect) { c.beginPath(); c.roundRect(item.x, item.y, item.w, h, 10); }
     else { c.beginPath(); c.rect(item.x, item.y, item.w, h); }
-    c.fillStyle = '#141419';
+    c.fillStyle = '#000000';
     c.fill();
-    c.strokeStyle = '#2a2a34';
-    c.lineWidth = 1;
+    c.strokeStyle = '#5e5e5e';
+    c.lineWidth = 2;
     c.stroke();
 
     c.textBaseline = 'top';
@@ -437,7 +511,7 @@ const Render = (() => {
     c.font = `600 ${s}px ${UI_FONT}`;
     c.fillText(item.title || 'Checklist', item.x + 10, y);
     y += s * 1.45 + 6;
-    c.strokeStyle = '#26262f';
+    c.strokeStyle = '#5e5e5e';
     c.beginPath(); c.moveTo(item.x, y - 4); c.lineTo(item.x + item.w, y - 4); c.stroke();
 
     c.font = `${s}px ${UI_FONT}`;
@@ -485,13 +559,13 @@ const Render = (() => {
     c.save();
     c.beginPath();
     if (c.roundRect) c.roundRect(item.x, item.y, item.w, h, 10); else c.rect(item.x, item.y, item.w, h);
-    c.fillStyle = '#151a24';
+    c.fillStyle = '#000000';
     c.fill();
-    c.strokeStyle = '#2b3547';
-    c.lineWidth = 1;
+    c.strokeStyle = '#5e5e5e';
+    c.lineWidth = 2;
     c.stroke();
     c.textBaseline = 'top';
-    c.fillStyle = '#7aa2ff';
+    c.fillStyle = '#ffffff';
     c.font = `600 ${s}px ${UI_FONT}`;
     c.fillText('→', item.x + 11, item.y + h / 2 - s * 0.75);
     c.fillStyle = '#e6e8ec';
@@ -547,7 +621,7 @@ const Render = (() => {
     handlePoints, drawMarquee, drawCursorRing,
     drawStroke, drawShape,
     getImage, imageCache,
-    setShowGrid, getShowGrid,
+    setShowGrid, getShowGrid, BACKGROUNDS,
     exportPNG,
     HANDLE_R
   };

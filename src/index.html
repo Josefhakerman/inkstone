@@ -4,18 +4,19 @@
 <meta charset="utf-8" />
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'" />
-<title>NoteApp</title>
+<title>InkStone</title>
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
 <div id="titlebar">
   <div class="tb-brand">
-    <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
-      <rect x="1" y="1" width="14" height="14" rx="3" fill="none" stroke="#6f7581" stroke-width="1.4"/>
-      <path d="M4.4 10.6 C6 6.6, 8.4 5.2, 11.6 5.2" fill="none" stroke="#8ab4ff" stroke-width="1.6" stroke-linecap="round"/>
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M1.6 9.4h12.8v1.5a3.2 3.2 0 0 1-3.2 3.2H4.8a3.2 3.2 0 0 1-3.2-3.2z" fill="currentColor"/>
+      <path d="M8 8.6V6.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="square"/>
+      <path d="M10.2 1.4 13 4.2 9.6 7.6 6.8 4.8z" fill="currentColor"/>
     </svg>
-    <span>NoteApp</span>
+    <span>InkStone</span>
   </div>
   <div class="tb-title" id="tbTitle"></div>
   <div class="tb-spacer"></div>
@@ -77,6 +78,7 @@
       <button class="sb-btn wide" id="btnFit" title="Fit all content (Shift+1)">Fit</button>
       <button class="sb-btn wide" id="btnHome" title="Go to origin (Home)">Center</button>
       <span class="sb-sep"></span>
+      <button class="sb-btn wide" id="btnPaper" title="Background for this workspace">Paper</button>
       <button class="sb-btn wide" id="btnExport" title="Export this workspace as a PNG">Export PNG</button>
       <span class="sb-flex"></span>
       <span class="sb-info" id="saveState"></span>

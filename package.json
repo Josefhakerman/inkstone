@@ -1,8 +1,8 @@
 {
-  "name": "noteapp",
-  "productName": "NoteApp",
+  "name": "inkstone",
+  "productName": "InkStone",
   "version": "1.0.0",
-  "description": "Offline infinite-canvas notes app for Windows. Microsoft Paint x Google Keep.",
+  "description": "Offline infinite-canvas notes app for Windows. Ink, blocks, and unlimited space.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -15,8 +15,8 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "com.josef.noteapp",
-    "productName": "NoteApp",
+    "appId": "com.josef.inkstone",
+    "productName": "InkStone",
     "files": [
       "main.js",
       "preload.js",
@@ -36,12 +36,13 @@
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "shortcutName": "NoteApp",
-      "createDesktopShortcut": true
+      "shortcutName": "InkStone",
+      "createDesktopShortcut": true,
+      "artifactName": "InkStone-${version}-setup.exe"
     },
     "afterPack": "build/after-pack.js",
     "portable": {
-      "artifactName": "NoteApp-${version}-portable.exe"
+      "artifactName": "InkStone-${version}-portable.exe"
     }
   },
   "allowScripts": {

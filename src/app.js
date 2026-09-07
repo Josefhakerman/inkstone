@@ -10,25 +10,34 @@ const App = (() => {
 
   function refreshTitle() {
     const t = document.getElementById('tbTitle');
-    if (!WS.isOpen()) { t.textContent = ''; document.title = 'NoteApp'; return; }
+    if (!WS.isOpen()) { t.textContent = ''; document.title = 'InkStone'; return; }
     const node = Store.find(WS.getId());
     const name = node ? node.name : WS.getName();
     WS.setName(name);
     const path = Store.pathOf(WS.getId());
     t.textContent = path.length ? `${path.join(' / ')} / ${name}` : name;
-    document.title = `${name} — NoteApp`;
+    document.title = `${name} — InkStone`;
   }
 
   function setSaveState(kind) {
     const el = document.getElementById('saveState');
     clearTimeout(saveStateTimer);
     if (kind === 'saving') { el.textContent = 'Saving…'; el.style.color = ''; }
-    else if (kind === 'error') { el.textContent = 'Not saved'; el.style.color = '#ff8f8f'; }
+    else if (kind === 'error') { el.textContent = 'Not saved'; el.style.color = 'var(--ink)'; }
     else {
       el.textContent = 'Saved';
       el.style.color = '';
       saveStateTimer = setTimeout(() => { el.textContent = ''; }, 1600);
     }
+  }
+
+  function updatePaperLabel() {
+    const btn = document.getElementById('btnPaper');
+    if (!btn) return;
+    if (!WS.isOpen()) { btn.textContent = 'Paper'; return; }
+    const bg = WS.getBackground();
+    const def = Render.BACKGROUNDS.find((b) => b.id === bg.type);
+    btn.textContent = def ? def.label : 'Paper';
   }
 
   function updateZoomLabel() {
@@ -67,6 +76,7 @@ const App = (() => {
       Elements.rebuild();
       Render.schedule();
       updateZoomLabel();
+      updatePaperLabel();
       Tools.renderProps();
     } finally {
       opening = false;
@@ -169,6 +179,7 @@ const App = (() => {
     ['Tools', null],
     ['V / H', 'Select / pan'],
     ['P / M / E', 'Draw, highlight, erase'],
+    ['E then Partial/Whole', 'Rub out part of a stroke, or all of it'],
     ['R / F', 'Shapes, fill a shape'],
     ['T / K', 'Text box, checklist'],
     ['I / L', 'Image, workspace link'],
@@ -179,7 +190,7 @@ const App = (() => {
     ['Ctrl + 0', 'Zoom to 100%'],
     ['Shift + 1', 'Fit everything on screen'],
     ['Home', 'Jump back to the centre'],
-    ['G', 'Toggle the dot grid'],
+    ['G', 'Cycle the workspace background'],
     ['Selection', null],
     ['Click / Shift+Click', 'Select / add to selection'],
     ['Drag on empty space', 'Rubber-band select'],
@@ -263,11 +274,6 @@ const App = (() => {
     Tools.init();
     Render.resize();
 
-    try {
-      const g = localStorage.getItem('showGrid');
-      if (g !== null) Render.setShowGrid(g === '1');
-    } catch (_) {}
-
     addEventListener('resize', resizeCanvas);
     addEventListener('keydown', onKeyDown);
 
@@ -277,6 +283,10 @@ const App = (() => {
     document.getElementById('btnFit').addEventListener('click', fitToContent);
     document.getElementById('btnHome').addEventListener('click', goHome);
     document.getElementById('btnExport').addEventListener('click', () => void exportPng());
+    document.getElementById('btnPaper').addEventListener('click', (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      Tools.openPaperMenu(r.left, r.top - 8);
+    });
     document.getElementById('btnHelp').addEventListener('click', showShortcuts);
     document.getElementById('btnRevealData').addEventListener('click', () => window.api.revealData());
 
@@ -300,7 +310,7 @@ const App = (() => {
   }
 
   return {
-    init, openWorkspace, refreshTitle, setSaveState, updateZoomLabel,
+    init, openWorkspace, refreshTitle, setSaveState, updateZoomLabel, updatePaperLabel,
     resizeCanvas, rebuildAll, copyLinkTarget, fitToContent, goHome,
     exportPng, showShortcuts, showEmptyState
   };
@@ -309,6 +319,6 @@ const App = (() => {
 window.addEventListener('DOMContentLoaded', () => {
   App.init().catch((err) => {
     console.error('startup failed', err);
-    U.toast('NoteApp could not start - see the console for details', 8000);
+    U.toast('InkStone could not start - see the console for details', 8000);
   });
 });
