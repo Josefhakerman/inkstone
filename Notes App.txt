@@ -1,0 +1,48 @@
+Noteapp
+
+An app for windows, compleatly offline. Microsoft paint x google keep
+an app for writing notes/ideas sorted into categories. In essence digital whiteboards for everything sorted 
+
+WORKSPACE
+
+black background, unlimited workspace (can move to right/left/up/down indefinitely
+
+tools:
+text box
+draw (adjustable thickness)
+highlighter tool
+simple shapes
+infill
+dynamic to do lists that i can add into workspaces
+ability to add photos into workspace
+ability to add links to other workspaces
+
+UI / MENU
+
+Dark theme
+left side bar with a file tree that stores these "workspaces"
+folders for workspaces should be creatable in app
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,50 @@
+{
+  "name": "noteapp",
+  "productName": "NoteApp",
+  "version": "1.0.0",
+  "description": "Offline infinite-canvas notes app for Windows. Microsoft Paint x Google Keep.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable"
+  },
+  "author": "Josef",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.josef.noteapp",
+    "productName": "NoteApp",
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "shortcutName": "NoteApp",
+      "createDesktopShortcut": true
+    },
+    "afterPack": "build/after-pack.js",
+    "portable": {
+      "artifactName": "NoteApp-${version}-portable.exe"
+    }
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  }
+}
