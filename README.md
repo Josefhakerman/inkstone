@@ -1,17 +1,26 @@
 # InkStone
 
 An offline Windows app for writing notes and ideas on unlimited black canvases,
-organised into folders. Monochrome, square-cornered, heavy-ruled.
+organised into folders. Microsoft Paint × Google Keep, in monochrome.
 
 Nothing leaves your machine: there is no network code in the app at all, and the
 renderer's content-security policy blocks outbound connections outright.
 
-## Run it
+![InkStone](docs/screenshot.png)
 
-**Installed** — run `dist/InkStone-1.3.0-setup.exe`. You can pick the install
-folder; it adds a Start Menu entry and a desktop shortcut.
+## Download
 
-**Portable** — run `dist/InkStone-1.3.0-portable.exe`. No install, no admin.
+Grab the latest build from the
+[releases page](https://github.com/Josefhakerman/inkstone/releases/latest):
+
+- **`InkStone-<version>-setup.exe`** — installer. You can pick the install
+  folder; it adds a Start Menu entry and a desktop shortcut.
+- **`InkStone-<version>-portable.exe`** — no install, no admin.
+
+The executables are not code-signed, so Windows SmartScreen shows an "unknown
+publisher" warning the first time: choose *More info → Run anyway*. If you would
+rather not take that on trust, [build it yourself](#building-from-source) — it
+is two commands.
 
 Your notes live in `%APPDATA%\InkStone\data`, not next to the exe, so both
 builds share the same library. The **Storage folder** button at the bottom of
@@ -150,6 +159,20 @@ colour survives is the drawing palette, because that is your ink rather than
 chrome — the defaults are all white, so a board stays monochrome unless you
 choose otherwise.
 
+## Licence
+
+MIT — see [LICENSE](LICENSE).
+
+## Contributing
+
+Issues and pull requests are welcome. There is no build step for the app
+itself: `npm start` runs the source directly, so a change to anything under
+`src/` is live on the next reload (`Ctrl+R`).
+
+If you are changing behaviour, please say in the PR how you checked it. The app
+is driven entirely by pointer and keyboard input, and most of the subtle bugs in
+its history have lived in that layer rather than in the drawing code.
+
 ## Building from source
 
 ```bash
@@ -188,6 +211,7 @@ src/tools.js         Tools, toolbar, properties bar, selection, pointer input
 src/app.js           Bootstrap and the glue between all of the above
 build/after-pack.js  Post-package icon/version stamping
 build/icon-source.png  Artwork the .ico is generated from
+docs/original-brief.txt  The note this app was built from
 ```
 
 Strokes, shapes and images are drawn on a canvas in world coordinates; text,
