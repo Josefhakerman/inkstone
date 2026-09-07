@@ -8,10 +8,10 @@ renderer's content-security policy blocks outbound connections outright.
 
 ## Run it
 
-**Installed** — run `dist/InkStone-1.0.0-setup.exe`. You can pick the install
+**Installed** — run `dist/InkStone-1.1.0-setup.exe`. You can pick the install
 folder; it adds a Start Menu entry and a desktop shortcut.
 
-**Portable** — run `dist/InkStone-1.0.0-portable.exe`. No install, no admin.
+**Portable** — run `dist/InkStone-1.1.0-portable.exe`. No install, no admin.
 
 Your notes live in `%APPDATA%\InkStone\data`, not next to the exe, so both
 builds share the same library. The **Storage folder** button at the bottom of
