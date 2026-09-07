@@ -279,6 +279,14 @@ input[type=range]::-webkit-slider-thumb{
 }
 .textedit:empty::before{content:attr(data-ph);color:var(--text-faint)}
 
+/* free text: no chrome at all, sized by its content */
+.textnode.free .nbody{background:transparent;border-color:transparent;width:max-content}
+.textnode.free:hover .nbody{border-color:transparent}
+.textnode.free .textedit{padding:2px 3px;cursor:move}
+.textnode.free .textedit[contenteditable="true"]{cursor:text;box-shadow:0 0 0 var(--b) var(--line-strong)}
+.textnode.free.sel .nbody{box-shadow:none}
+.textnode.free.sel .textedit{box-shadow:0 0 0 var(--b) var(--ink)}
+
 /* checklist */
 .todonode .nbody{background:#000}
 .todo-title{

@@ -28,15 +28,21 @@ const Elements = (() => {
     document.execCommand('insertText', false, text);
   }
 
-  /* Records the laid-out height back onto the item so bounds/fit/export work. */
+  /* Records the laid-out size back onto the item so bounds/fit/export work.
+     Boxed items own their width; free text is measured in both directions. */
   function measure(item, root) {
     const el = root || nodes.get(item.id);
     if (!el) return;
-    const h = el.firstElementChild ? el.firstElementChild.offsetHeight : el.offsetHeight;
-    if (h && Math.abs(h - (item.h || 0)) > 0.5) {
-      item.h = h;
-      Render.schedule();
+    const body = el.firstElementChild;
+    if (!body) return;
+    let changed = false;
+    const h = body.offsetHeight;
+    if (h && Math.abs(h - (item.h || 0)) > 0.5) { item.h = h; changed = true; }
+    if (item.type === 'text' && item.boxed === false) {
+      const w = body.offsetWidth;
+      if (w && Math.abs(w - (item.w || 0)) > 0.5) { item.w = w; changed = true; }
     }
+    if (changed) Render.schedule();
   }
 
   function measureAll() {
@@ -81,24 +87,50 @@ const Elements = (() => {
   /* ---------------------------------------------------------- text node */
 
   function buildText(item) {
-    const root = U.el('div', { class: 'node textnode', dataset: { id: item.id } });
+    // Free text has no box at all: it sits directly on the canvas, sizes itself
+    // to its content, and is dragged by its body rather than a handle bar.
+    const free = item.boxed === false;
+
+    const root = U.el('div', {
+      class: 'node textnode' + (free ? ' free' : ''),
+      dataset: { id: item.id }
+    });
     const body = U.el('div', { class: 'nbody' });
-    const bar = U.el('div', { class: 'thandlebar' });
+    const bar = free ? null : U.el('div', { class: 'thandlebar' });
     const edit = U.el('div', {
       class: 'textedit',
-      contenteditable: 'true',
+      contenteditable: free ? 'false' : 'true',
       spellcheck: 'false',
-      'data-ph': 'Type something…'
+      'data-ph': free ? 'Text…' : 'Type something…'
     });
     edit.textContent = item.text || '';
-    body.appendChild(bar);
+    if (bar) body.appendChild(bar);
     body.appendChild(edit);
     root.appendChild(body);
 
-    wireDragHandle(bar, item);
+    if (bar) wireDragHandle(bar, item);
     wireCommon(root, item);
 
+    if (free) {
+      // Click to pick up and move, double-click to start typing.
+      root.addEventListener('mousedown', (e) => {
+        if (e.button !== 0 || e.altKey) return;
+        if (edit.isContentEditable) return;          // already editing
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.shiftKey) Tools.toggleSelect(item.id);
+        else if (!Tools.isSelected(item.id)) Tools.selectOnly(item.id);
+        Tools.beginMoveDrag(e);
+      });
+      root.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        beginFreeEdit(item, root);
+      });
+    }
+
     edit.addEventListener('mousedown', (e) => {
+      if (free && !edit.isContentEditable) return;   // handled by the root
       e.stopPropagation();
       if (e.altKey) return;
       if (!Tools.isSelected(item.id)) Tools.selectOnly(item.id, { keepFocus: true });
@@ -110,10 +142,11 @@ const Elements = (() => {
     });
     edit.addEventListener('blur', () => {
       if (editingId === item.id) editingId = null;
+      if (free) edit.setAttribute('contenteditable', 'false');
       const text = edit.innerText.replace(/ /g, ' ');
       if (text !== item.text) { item.text = text; WS.markDirty(); }
       measure(item, root);
-      // An empty text box left behind is just noise - drop it.
+      // Empty text left behind is just noise - drop it.
       if (!item.text.trim()) {
         WS.removeIds([item.id]);
         Tools.deselect(item.id);
@@ -139,10 +172,31 @@ const Elements = (() => {
   function applyTextStyle(root, item) {
     const body = root.querySelector('.nbody');
     const edit = root.querySelector('.textedit');
-    body.style.width = item.w + 'px';
+    if (item.boxed === false) {
+      body.style.width = '';           // width comes from the content
+      body.style.maxWidth = '2400px';
+    } else {
+      body.style.width = item.w + 'px';
+      body.style.maxWidth = '';
+    }
     edit.style.fontSize = item.size + 'px';
     edit.style.color = item.color;
     edit.style.fontWeight = item.bold ? '650' : '400';
+  }
+
+  /* Turns a free-text item into an editable caret and focuses it. */
+  function beginFreeEdit(item, root) {
+    const node = root || nodes.get(item.id);
+    if (!node) return;
+    const edit = node.querySelector('.textedit');
+    if (!edit) return;
+    edit.setAttribute('contenteditable', 'true');
+    edit.focus();
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(edit);
+    sel.removeAllRanges();
+    sel.addRange(range);
   }
 
   /* ---------------------------------------------------------- todo node */
@@ -496,6 +550,7 @@ const Elements = (() => {
     if (!node) return;
     const target = node.querySelector('.textedit') || node.querySelector('.todo-title');
     if (!target) return;
+    if (!target.isContentEditable) target.setAttribute('contenteditable', 'true');
     target.focus();
     const sel = window.getSelection();
     const range = document.createRange();
@@ -518,6 +573,6 @@ const Elements = (() => {
 
   return {
     rebuild, addNode, removeNode, refreshStyle, syncTransforms, syncOne,
-    setInteractive, focusText, isEditing, blurEditing, getNode, measure, measureAll
+    setInteractive, focusText, beginFreeEdit, isEditing, blurEditing, getNode, measure, measureAll
   };
 })();

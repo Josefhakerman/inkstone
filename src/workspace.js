@@ -235,8 +235,9 @@ const WS = (() => {
           x: num(it.x), y: num(it.y), w: U.clamp(num(it.w, 260), 40, 6000), h: num(it.h, 40),
           text: typeof it.text === 'string' ? it.text : '',
           color: typeof it.color === 'string' ? it.color : '#ffffff',
-          size: U.clamp(num(it.size, 18), 6, 200),
-          bold: !!it.bold
+          size: U.clamp(num(it.size, 18), 6, 400),
+          bold: !!it.bold,
+          boxed: it.boxed !== false
         });
       } else if (it.type === 'todo') {
         out.push({

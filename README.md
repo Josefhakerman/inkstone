@@ -8,10 +8,10 @@ renderer's content-security policy blocks outbound connections outright.
 
 ## Run it
 
-**Installed** — run `dist/InkStone-1.1.0-setup.exe`. You can pick the install
+**Installed** — run `dist/InkStone-1.2.0-setup.exe`. You can pick the install
 folder; it adds a Start Menu entry and a desktop shortcut.
 
-**Portable** — run `dist/InkStone-1.1.0-portable.exe`. No install, no admin.
+**Portable** — run `dist/InkStone-1.2.0-portable.exe`. No install, no admin.
 
 Your notes live in `%APPDATA%\InkStone\data`, not next to the exe, so both
 builds share the same library. The **Storage folder** button at the bottom of
@@ -55,10 +55,23 @@ tool sits centred on the top edge.
 | ◇ | Eraser | `E` |
 | ▭ | Shapes — rectangle, ellipse, diamond, line, arrow | `R` |
 | 🪣 | Fill a shape | `F` |
-| T | Text box | `T` |
+| T | Text — free or boxed | `T` |
 | ☑ | Checklist | `K` |
 | 🖼 | Image | `I` |
 | 🔗 | Link to another workspace | `L` |
+
+### Text
+
+Two styles, switched in the properties bar:
+
+- **Free** (default) is bare text straight on the canvas — no box, no border,
+  no handle bar. It sizes itself to what you type and only breaks where you
+  press Enter. Click and drag it to move, double-click to start typing, and
+  drag a corner to scale the type.
+- **Box** is a fixed-width block that wraps its text. Drag its left or right
+  edge, or any corner, to change the width; the height follows the content.
+
+**Unbox** / **Box** in the selection properties converts one into the other.
 
 ### Eraser
 
@@ -98,13 +111,22 @@ Search filters the tree and opens folders to show matches.
 
 ## Selection
 
-Click to select, shift-click to add, or drag on empty canvas to rubber-band. A
-single selected item gets resize handles — text boxes, checklists and links
-resize by width only, since their height follows their content. Images keep
-their aspect ratio unless you hold alt.
+Click to select, shift-click to add, or drag on empty canvas to rubber-band.
+Images keep their aspect ratio unless you hold alt.
+
+Only the handles that actually do something are drawn, so nothing on screen
+looks grabbable when it is not:
+
+| Item | Handles | What they do |
+|---|---|---|
+| Shapes, strokes, images | all eight | resize freely |
+| Boxed text, checklists, links | left, right, corners | width only — height follows the content |
+| Free text | the four corners | scale the type size |
 
 The properties bar retargets to whatever is selected, so you can recolour,
 resize or restack after the fact. `[` and `]` send to back and bring to front.
+Changing a value there also updates the matching tool default, so the next
+thing you draw inherits it instead of snapping back to the old value.
 
 ## Saving
 

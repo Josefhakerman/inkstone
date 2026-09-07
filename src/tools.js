@@ -19,7 +19,7 @@ const Tools = (() => {
     hlColor: '#ffd43b', hlWidth: 22,
     eraserSize: 26, eraserMode: 'part',
     shapeColor: '#ffffff', shapeWidth: 2, shapeFill: null,
-    textColor: '#ffffff', textSize: 18, textBold: false,
+    textColor: '#ffffff', textSize: 18, textBold: false, textBoxed: false,
     todoColor: '#ffffff', todoSize: 15,
     fillColor: '#ffffff'
   };
@@ -85,6 +85,21 @@ const Tools = (() => {
   }
 
   const canResizeSelection = () => selection.size === 1;
+
+  /* Handles that actually do something for the selected item. Only these are
+     drawn, so nothing on screen looks grabbable when it is not. */
+  function activeHandles() {
+    if (selection.size !== 1) return [];
+    const item = selectionItems()[0];
+    if (!item) return [];
+    if (item.type === 'text' && item.boxed === false) {
+      return ['nw', 'ne', 'se', 'sw'];          // corners scale the type size
+    }
+    if (item.type === 'text' || item.type === 'todo' || item.type === 'link') {
+      return ['w', 'e', 'nw', 'ne', 'sw', 'se']; // width only; height follows content
+    }
+    return ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+  }
 
   /* ------------------------------------------------------- hit testing */
 
@@ -200,11 +215,13 @@ const Tools = (() => {
 
   /* ------------------------------------------------------- item factory */
 
-  function newTextItem(wx, wy, w) {
+  function newTextItem(wx, wy, w, boxed) {
+    const isBoxed = boxed === undefined ? state.textBoxed : boxed;
     return {
       id: U.uid('i'), type: 'text',
-      x: wx, y: wy, w: w || 280, h: 44,
-      text: '', color: state.textColor, size: state.textSize, bold: state.textBold
+      x: wx, y: wy, w: w || (isBoxed ? 280 : 120), h: 44,
+      text: '', color: state.textColor, size: state.textSize, bold: state.textBold,
+      boxed: isBoxed
     };
   }
 
@@ -560,12 +577,27 @@ const Tools = (() => {
     if (handle.includes('n')) { nh = box.y + box.h - wy; ny = wy; }
     if (handle.includes('s')) { nh = wy - box.y; }
 
+    // Free text has no box to stretch, so its corners scale the type instead.
+    if (item.type === 'text' && item.boxed === false) {
+      const k = U.clamp(Math.max(Math.abs(nw) / Math.max(box.w, 1),
+                                 Math.abs(nh) / Math.max(box.h, 1)), 0.1, 12);
+      item.size = U.clamp(snapshot.size * k, 6, 400);
+      if (handle.includes('w')) item.x = box.x + box.w - box.w * k;
+      if (handle.includes('n')) item.y = box.y + box.h - box.h * k;
+      if (!gesture.committed) { WS.commit(); gesture.committed = true; }
+      Elements.refreshStyle(item);
+      WS.markDirty();
+      Render.schedule();
+      return;
+    }
+
     const domItem = item.type === 'text' || item.type === 'todo' || item.type === 'link';
     if (domItem) {
       // Width only - height follows the content.
       nw = Math.max(60, nw);
       item.w = nw;
       if (handle.includes('w')) item.x = box.x + box.w - nw;
+      if (!gesture.committed) { WS.commit(); gesture.committed = true; }
       Elements.refreshStyle(item);
       WS.markDirty();
       Render.schedule();
@@ -602,17 +634,20 @@ const Tools = (() => {
   }
 
   /* Handle under the cursor, in screen space. */
+  const HANDLE_GRAB = 11;   // generous, so handles are easy to catch
+
   function handleAt(sx, sy) {
     if (!canResizeSelection()) return null;
     const box = selectionBounds();
     if (!box) return null;
-    const item = selectionItems()[0];
-    const domItem = item && (item.type === 'text' || item.type === 'todo' || item.type === 'link');
+    const live = activeHandles();
+    let best = null, bestD = Infinity;
     for (const h of Render.handlePoints(box)) {
-      if (domItem && h.k !== 'e' && h.k !== 'w') continue;
-      if (U.dist(sx, sy, h.x, h.y) <= Render.HANDLE_R + 4) return h.k;
+      if (!live.includes(h.k)) continue;
+      const d = U.dist(sx, sy, h.x, h.y);
+      if (d <= HANDLE_GRAB && d < bestD) { best = h.k; bestD = d; }
     }
-    return null;
+    return best;
   }
 
   const CURSOR_FOR_HANDLE = {
@@ -790,7 +825,7 @@ const Tools = (() => {
     Elements.addNode(item);
     setTool('select');
     selectOnly(item.id, { keepFocus: true });
-    requestAnimationFrame(() => Elements.focusText(item.id));
+    Elements.focusText(item.id);
   }
 
   function placeTodo(e) {
@@ -801,11 +836,9 @@ const Tools = (() => {
     Elements.addNode(item);
     setTool('select');
     selectOnly(item.id, { keepFocus: true });
-    requestAnimationFrame(() => {
-      const node = Elements.getNode(item.id);
-      const t = node && node.querySelector('.todo-title');
-      if (t) t.focus();
-    });
+    const todoNode = Elements.getNode(item.id);
+    const title = todoNode && todoNode.querySelector('.todo-title');
+    if (title) title.focus();
   }
 
   async function placeImage(e) {
@@ -1034,7 +1067,7 @@ const Tools = (() => {
     U.contextMenu(x, y, [
       { label: 'Paste here', icon: 'copy', key: 'Ctrl+V', action: pasteClipboard },
       { sep: true },
-      { label: 'Add text box', icon: 'text', action: () => { const i = newTextItem(world[0], world[1]); WS.commit(); WS.add(i); Elements.addNode(i); selectOnly(i.id, { keepFocus: true }); requestAnimationFrame(() => Elements.focusText(i.id)); } },
+      { label: 'Add text box', icon: 'text', action: () => { const i = newTextItem(world[0], world[1]); WS.commit(); WS.add(i); Elements.addNode(i); selectOnly(i.id, { keepFocus: true }); Elements.focusText(i.id); } },
       { label: 'Add checklist', icon: 'todo', action: () => { const i = newTodoItem(world[0], world[1]); WS.commit(); WS.add(i); Elements.addNode(i); selectOnly(i.id); } },
       { label: 'Add workspace link', icon: 'link', action: async () => { const t = await pickWorkspace('Link to workspace'); if (!t) return; const i = newLinkItem(world[0], world[1], t.id, t.name); WS.commit(); WS.add(i); Elements.addNode(i); selectOnly(i.id); } },
       { sep: true },
@@ -1257,7 +1290,21 @@ const Tools = (() => {
             onclick: () => { state.fillColor = null; saveState(); U.toast('Click a shape to clear its fill'); }
           }));
           break;
-        case 'text':
+        case 'text': {
+          const kinds = [
+            [false, 'Free', 'Bare text straight on the canvas, no box'],
+            [true, 'Box', 'A fixed-width box that wraps its text']
+          ];
+          const row = U.el('div', { class: 'pgroup' });
+          row.appendChild(U.el('span', { class: 'plabel', text: 'Style' }));
+          for (const [val, label, hint] of kinds) {
+            row.appendChild(U.el('button', {
+              class: 'pbtn' + (state.textBoxed === val ? ' on' : ''),
+              text: label, title: hint,
+              onclick: () => { state.textBoxed = val; saveState(); renderProps(); }
+            }));
+          }
+          parts.push(row, sep());
           parts.push(U.el('div', { class: 'pgroup' }, [
             U.el('span', { class: 'plabel', text: 'Colour' }),
             swatchRow(PALETTE, state.textColor, (c) => { state.textColor = c; saveState(); renderProps(); })
@@ -1268,6 +1315,7 @@ const Tools = (() => {
             onclick: () => { state.textBold = !state.textBold; saveState(); renderProps(); }
           }));
           break;
+        }
         case 'todo':
           parts.push(U.el('div', { class: 'pgroup' }, [
             U.el('span', { class: 'plabel', text: 'Accent' }),
@@ -1285,28 +1333,63 @@ const Tools = (() => {
     for (const p of parts) panel.appendChild(p);
   }
 
+  /* Editing a selection also updates the matching tool default, so the next
+     thing you draw inherits it instead of snapping back to the old value. */
+  function stickDefault(field, value, items) {
+    const kinds = new Set(items.map((i) => i.type));
+    if (field === 'color') {
+      if (kinds.has('stroke')) {
+        for (const it of items) {
+          if (it.type !== 'stroke') continue;
+          if (it.tool === 'highlighter') state.hlColor = value; else state.penColor = value;
+        }
+      }
+      if (kinds.has('shape')) state.shapeColor = value;
+      if (kinds.has('text')) state.textColor = value;
+      if (kinds.has('todo')) state.todoColor = value;
+    } else if (field === 'width') {
+      for (const it of items) {
+        if (it.type === 'shape') state.shapeWidth = value;
+        else if (it.type === 'stroke') {
+          if (it.tool === 'highlighter') state.hlWidth = value; else state.penWidth = value;
+        }
+      }
+    } else if (field === 'fill') {
+      if (kinds.has('shape')) state.shapeFill = value;
+    } else if (field === 'size') {
+      if (kinds.has('text')) state.textSize = value;
+      if (kinds.has('todo')) state.todoSize = value;
+    } else if (field === 'bold') {
+      if (kinds.has('text')) state.textBold = value;
+    }
+    saveState();
+  }
+
   /* Controls that edit whatever is currently selected. */
   function selectionProps() {
     const items = selectionItems();
     const parts = [];
     const has = (t) => items.some((i) => i.type === t);
-    const applyAll = (fn) => {
+    const applyAll = (fn, field, value) => {
       WS.commit();
       for (const it of items) fn(it);
+      if (field) stickDefault(field, value, items);
       WS.markDirty();
       for (const it of items) if (it.type === 'text' || it.type === 'todo' || it.type === 'link') Elements.refreshStyle(it);
       Render.schedule();
       renderProps();
     };
 
-    parts.push(U.el('span', { class: 'plabel', text: `${items.length} selected` }), sep());
+    parts.push(U.el('div', { class: 'pgroup' }, [
+      U.el('span', { class: 'plabel', text: `${items.length} selected` })
+    ]), sep());
 
     const colorful = items.filter((i) => i.type === 'stroke' || i.type === 'shape' || i.type === 'text' || i.type === 'todo');
     if (colorful.length) {
       const current = colorful[0].color;
       parts.push(U.el('div', { class: 'pgroup' }, [
         U.el('span', { class: 'plabel', text: 'Colour' }),
-        swatchRow(PALETTE, current, (c) => applyAll((it) => { if ('color' in it) it.color = c; }))
+        swatchRow(PALETTE, current, (c) => applyAll((it) => { if ('color' in it) it.color = c; }, 'color', c))
       ]), sep());
     }
 
@@ -1314,7 +1397,7 @@ const Tools = (() => {
       parts.push(U.el('div', { class: 'pgroup' }, [
         U.el('span', { class: 'plabel', text: 'Fill' }),
         swatchRow(FILL_PALETTE, items.find((i) => i.type === 'shape').fill,
-          (c) => applyAll((it) => { if (it.type === 'shape') it.fill = c; }))
+          (c) => applyAll((it) => { if (it.type === 'shape') it.fill = c; }, 'fill', c))
       ]), sep());
     }
 
@@ -1322,6 +1405,7 @@ const Tools = (() => {
       const w = (items.find((i) => i.type === 'stroke' || i.type === 'shape')).width;
       parts.push(slider('Width', w, 0, 60, 0.5, (v) => {
         for (const it of items) if (it.type === 'stroke' || it.type === 'shape') it.width = v;
+        stickDefault('width', v, items);
         WS.markDirty();
         Render.schedule();
       }), sep());
@@ -1331,6 +1415,7 @@ const Tools = (() => {
       const s = (items.find((i) => i.type === 'text' || i.type === 'todo' || i.type === 'link')).size;
       parts.push(slider('Text', s, 8, 96, 1, (v) => {
         for (const it of items) if ('size' in it) it.size = v;
+        stickDefault('size', v, items);
         WS.markDirty();
         for (const it of items) if (it.type === 'text' || it.type === 'todo' || it.type === 'link') Elements.refreshStyle(it);
         Render.schedule();
@@ -1338,10 +1423,24 @@ const Tools = (() => {
     }
 
     if (has('text')) {
+      const boxed = items.find((i) => i.type === 'text').boxed !== false;
+      parts.push(U.el('button', {
+        class: 'pbtn', text: boxed ? 'Unbox' : 'Box',
+        title: boxed ? 'Turn into free text' : 'Wrap in a fixed-width box',
+        onclick: () => {
+          WS.commit();
+          for (const it of items) if (it.type === 'text') it.boxed = !boxed;
+          state.textBoxed = !boxed;
+          saveState();
+          WS.markDirty();
+          Elements.rebuild();
+          afterSelectionChange();
+        }
+      }));
       const bold = items.find((i) => i.type === 'text').bold;
       parts.push(U.el('button', {
         class: 'pbtn' + (bold ? ' on' : ''), text: 'Bold',
-        onclick: () => applyAll((it) => { if (it.type === 'text') it.bold = !bold; })
+        onclick: () => applyAll((it) => { if (it.type === 'text') it.bold = !bold; }, 'bold', !bold)
       }));
     }
 
@@ -1451,7 +1550,7 @@ const Tools = (() => {
       e.preventDefault();
       const at = hoverWorld || [WS.getCamera().x, WS.getCamera().y];
       WS.commit();
-      const item = newTextItem(at[0], at[1], 360);
+      const item = newTextItem(at[0], at[1], 360, true);
       item.text = text.trim();
       WS.add(item);
       Elements.addNode(item);
@@ -1565,7 +1664,7 @@ const Tools = (() => {
   return {
     init, setTool, getTool, getState,
     getSelection, isSelected, selectOnly, selectMany, toggleSelect, deselect, clearSelection,
-    selectionBounds, canResizeSelection, selectionItems,
+    selectionBounds, canResizeSelection, selectionItems, activeHandles,
     beginMoveDrag, openSelectionMenu,
     deleteSelection, duplicateSelection, copySelection, pasteClipboard, selectAll,
     zoomBy, zoomAt, renderProps, renderToolbar, openPaperMenu, cyclePaper,

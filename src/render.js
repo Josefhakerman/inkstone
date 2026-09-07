@@ -409,10 +409,12 @@ const Render = (() => {
         octx.strokeStyle = '#ffffff';
         octx.lineWidth = 2;
         octx.strokeRect(x0, y0, x1 - x0, y1 - y0);
-        if (Tools.canResizeSelection()) {
+        const live = Tools.activeHandles();
+        if (live.length) {
           octx.fillStyle = '#000000';
           octx.lineWidth = 2;
           for (const h of handlePoints(box)) {
+            if (!live.includes(h.k)) continue;
             octx.fillRect(h.x - HANDLE_R, h.y - HANDLE_R, HANDLE_R * 2, HANDLE_R * 2);
             octx.strokeRect(h.x - HANDLE_R, h.y - HANDLE_R, HANDLE_R * 2, HANDLE_R * 2);
           }
@@ -478,15 +480,20 @@ const Render = (() => {
   const UI_FONT = '"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif';
 
   function drawTextItemFlat(c, item) {
+    const free = item.boxed === false;
     c.save();
     c.fillStyle = item.color;
     c.font = `${item.bold ? '600 ' : ''}${item.size}px ${UI_FONT}`;
     c.textBaseline = 'top';
     const lineH = item.size * 1.4;
-    const lines = wrapText(c, item.text || '', item.w - 18);
-    let y = item.y + 14 + 6;
+    // Free text has no handle bar and never wraps; a box has both.
+    const lines = free
+      ? String(item.text || '').split('\n')
+      : wrapText(c, item.text || '', item.w - 18);
+    const padX = free ? 3 : 9;
+    let y = item.y + (free ? 2 : 20);
     for (const ln of lines) {
-      c.fillText(ln, item.x + 9, y);
+      c.fillText(ln, item.x + padX, y);
       y += lineH;
     }
     c.restore();
