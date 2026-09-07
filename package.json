@@ -42,7 +42,8 @@
     },
     "afterPack": "build/after-pack.js",
     "portable": {
-      "artifactName": "Kivrn-${version}-portable.exe"
+      "artifactName": "Kivrn-${version}-portable.exe",
+      "unpackDirName": "Kivrn"
     }
   },
   "allowScripts": {

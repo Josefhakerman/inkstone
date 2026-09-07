@@ -13,9 +13,14 @@ renderer's content-security policy blocks outbound connections outright.
 Grab the latest build from the
 [releases page](https://github.com/Josefhakerman/kivrn/releases/latest):
 
-- **`Kivrn-<version>-setup.exe`** — installer. You can pick the install
-  folder; it adds a Start Menu entry and a desktop shortcut.
-- **`Kivrn-<version>-portable.exe`** — no install, no admin.
+- **`Kivrn-<version>-setup.exe`** — installer, and the one to use. You can pick
+  the install folder; it adds a Start Menu entry and a desktop shortcut. Starts
+  in about a quarter of a second.
+- **`Kivrn-<version>-portable.exe`** — no install, no admin, but **slow to
+  start**: a portable exe is a self-extracting archive, so every launch unpacks
+  the whole ~100 MB app to a temp folder before it can run. Measured at roughly
+  **9 seconds per launch against 0.25 s for the installed build**. Use it only
+  if you cannot install, on a locked-down machine or a USB stick.
 
 The executables are not code-signed, so Windows SmartScreen shows an "unknown
 publisher" warning the first time: choose *More info → Run anyway*. If you would
